@@ -1,0 +1,7 @@
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/RedisCommonSink.java
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/Serializer/AbstractSerializer.java
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/Serializer/JsonSerializer.java
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/Serializer/RawSerializer.java
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/Serializer/SerializeException.java
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/AbstractRedisSink.java
+/Users/wttttt/programming/workspace/plugins/src/main/java/com/wttttt/flume/plugins/RedisPublishSink.java

@@ -1,0 +1,7 @@
+com/wttttt/flume/plugins/RedisPublishSink.class
+com/wttttt/flume/plugins/Serializer/AbstractSerializer.class
+com/wttttt/flume/plugins/AbstractRedisSink.class
+com/wttttt/flume/plugins/Serializer/SerializeException.class
+com/wttttt/flume/plugins/Serializer/RawSerializer.class
+com/wttttt/flume/plugins/Serializer/JsonSerializer.class
+com/wttttt/flume/plugins/RedisCommonSink.class
