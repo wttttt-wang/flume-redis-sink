@@ -6,20 +6,25 @@ import org.apache.flume.sink.AbstractSink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.wttttt.flume.plugins.Serializer.AbstractSerializer;
 
 import redis.clients.jedis.BinaryJedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 
 public abstract class AbstractRedisSink extends AbstractSink implements Configurable{
 	protected static final Logger logger = LoggerFactory.getLogger(AbstractRedisSink.class);
 
     protected BinaryJedis jedis;
+    
     private String redisHost;
     private int redisPort;
     private int redisTimeout;
     private String redisPwd;
     protected AbstractSerializer serializer;
+    
 
     public synchronized void start(){
     		jedis = new BinaryJedis(redisHost, redisPort, redisTimeout);
@@ -29,7 +34,7 @@ public abstract class AbstractRedisSink extends AbstractSink implements Configur
     		try{
     			jedis.connect();
     		} catch(Exception ex){
-    			logger.error("Unable to connect to Redis, host: " + redisHost + ", port: " + redisPort, ex);
+    			logger.error("Unable to connect to Redis, host: " + redisHost + ", port: " + String.valueOf(redisPort), ex);
     			return;
     		}
         super.start();
@@ -57,12 +62,12 @@ public abstract class AbstractRedisSink extends AbstractSink implements Configur
 				Class<? extends AbstractSerializer> clazz = (Class<? extends AbstractSerializer>) Class.forName(serializerName);
             serializer = clazz.newInstance();
     		} catch(ClassNotFoundException ex){
-    			logger.error("Cannot instantiate event serializer");
+    			logger.error("Cannot instantiate event serializer, named: " + serializerName);
     		} catch (InstantiationException e) {
-                logger.error("Cannot not instantiate event serializer", e);
+                logger.error("Cannot not instantiate event serializer, named: " + serializerName, e);
                 Throwables.propagate(e);
         } catch (IllegalAccessException e) {
-                logger.error("Cannot not instantiate event serializer", e);
+                logger.error("Cannot not instantiate event serializer, named: " + serializerName, e);
                 Throwables.propagate(e);
         }
     }

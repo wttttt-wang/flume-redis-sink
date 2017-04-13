@@ -34,23 +34,22 @@ public class RedisPublishSink extends AbstractRedisSink{
    	 Transaction txn = ch.getTransaction();
    	 txn.begin();
    	 try{
-   		// TODO: batchsize
    		Event event = ch.take();
    		if (event == null){
    			status = Status.BACKOFF;
    			txn.commit();
    		}else{
-   		// serialize event to String
-        byte[] serialized = serializer.serialize(event);
+   			logger.debug("Handling event, event body: " + new String(event.getBody()));
+   			// serialize event
+   			byte[] serialized = serializer.serialize(event);
 
-   		if (jedis.publish(redisChannel, serialized) > 0){
-            txn.commit();
-        } else{
-        		// throw
-            throw new EventDeliveryException("Event published, but no subscriber named" + redisChannel);
-        }
-   		status = Status.READY;
-   		}
+   			if (jedis.publish(redisChannel, serialized) > 0){
+   				txn.commit();
+   			} else{
+   				throw new EventDeliveryException("Event published, but no subscriber named" + redisChannel);
+   			}
+   			status = Status.READY;
+   			}
    	 } catch (Throwable t){
    		logger.error("Failed to publish events", t);
    		 status = Status.BACKOFF;

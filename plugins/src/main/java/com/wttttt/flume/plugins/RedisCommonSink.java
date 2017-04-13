@@ -1,10 +1,15 @@
 package com.wttttt.flume.plugins;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.flume.Channel;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.EventDeliveryException;
 import org.apache.flume.Transaction;
+import org.apache.flume.Sink.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,41 +23,51 @@ public class RedisCommonSink extends AbstractRedisSink{
 
 	private int redisDatabase;
 	private String redisDataType;
+	private String redisFuncType;
 	private byte[] redisKey;
+	private Integer redisBatchSize;
 
 	public Status process() throws EventDeliveryException {
-		Status status = null;
-		Channel ch = getChannel();
-		Transaction txn = ch.getTransaction();
-		txn.begin();
+		Status status = Status.READY;
+		Channel channel = getChannel();
+		Transaction txn = null;
+		Event event = null;
+		List<byte[]> batchEvents = new ArrayList<byte[]>(redisBatchSize);
 		try{
-			Event event = ch.take();
-			if(event == null){
-				status = Status.BACKOFF;
-				txn.commit();
-			} else{
-				byte[] serialized = serializer.serialize(event);
-				// TODO: add code reuse here
-				if("redisList".equals(redisDataType)){
-					if (jedis.lpush(redisKey, serialized) > 0){
+			long processedEvents = 0;
+			txn = channel.getTransaction();
+			txn.begin();
+			for (; processedEvents < redisBatchSize; processedEvents += 1){
+				event = channel.take();
+				if (event == null){
+					// no events available in channel
+					if (processedEvents == 0){
 						txn.commit();
-					} else{
-						throw new EventDeliveryException("Cannot push event to list: " + redisKey);
+						status = Status.BACKOFF;
 					}
-				} else if ("redisSet".equals(redisDataType)){
-					if (jedis.sadd(redisKey, serialized) > 0){
-						txn.commit();
-					} else{
-						throw new EventDeliveryException("Cannot add event to set: " + redisKey);
-					}
-				} else{  // "redisString"
-					if (jedis.append(redisKey, serialized) > 0){
-						txn.commit();
-					} else{
-						throw new EventDeliveryException("Cannot append event to String: " + redisKey);
-					}
+					break;
 				}
-				status = Status.READY;
+				logger.debug("Adding event, event body: " + new String(event.getBody()) + " to batch.");
+				batchEvents.add(serializer.serialize(event));
+			}
+			
+			// publish batch and commit
+			if (batchEvents.size() > 0) {
+				logger.info("Sending " + batchEvents.size() + " events");
+				
+				byte[][] redisEvents = new byte[batchEvents.size()][];
+				int index = 0;
+				for (byte[] redisEvent : batchEvents){
+					redisEvents[index] = redisEvent;
+					index ++;
+				}
+				
+				Method method = jedis.getClass().getMethod(redisFuncType, byte[].class, byte[][].class);
+				if ( Long.valueOf(String.valueOf(method.invoke(jedis, redisKey, redisEvents))).longValue() > 0 ){
+					txn.commit();
+				} else{
+					throw new EventDeliveryException("Cannot push event to " + redisDataType + ", key:" + redisKey);
+				}
 			}
 		} catch(Throwable t){
 			logger.error("Falied to push event", t);
@@ -82,9 +97,16 @@ public class RedisCommonSink extends AbstractRedisSink{
 	
 	@Override
 	public void configure(Context context){
+		redisBatchSize = context.getInteger("redisBatchSize", 100);
+		Preconditions.checkState(redisBatchSize > 0, "BatchSize must be greater than 1");
 		redisDatabase = context.getInteger("redisDatabase", 0);
 		redisDataType = context.getString("redisDataType", "redisList");
 		redisKey = context.getString("redisKey").getBytes();
+		if("redisSet".equals(redisDataType)){
+			redisFuncType = "sadd";
+		} else{
+			redisFuncType = "lpush";
+		}
 		
 		Preconditions.checkNotNull(redisKey, "Redis key cannot be null.");
 		super.configure(context);
@@ -99,12 +121,13 @@ public class RedisCommonSink extends AbstractRedisSink{
 			if (!"OK".equals(jedis.select(redisDatabase))){
 				throw new RuntimeException("Cannot select database " + redisDatabase);	
 			}
+			logger.info("DataBase: " + String.valueOf(redisDatabase) + "selected");
 		}
 	}
 	
 	@Override
 	public void stop(){
-		jedis.disconnect();
+		// jedis.disconnect();
         super.stop();
 	}
 
